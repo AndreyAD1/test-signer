@@ -6,13 +6,12 @@ import (
 )
 
 type HandlerContainer struct {
-	apiSecret    string
+	ApiSecret    string
 	SignatureSvc *services.SignatureSvc
 }
 
 type SignAnswersRequest struct {
 	ID          string   `json:"id"`
-	JwtToken    string   `json:"jwt"`
 	TestAnswers []answer `json:"test"`
 }
 

@@ -22,7 +22,10 @@ type Server struct {
 
 func NewServer(ctx context.Context, config configuration.ServerConfig) (*Server, error) {
 	signatureSvc := services.NewSignatureSvc()
-	handlers := h.HandlerContainer{SignatureSvc: signatureSvc}
+	handlers := h.HandlerContainer{
+		ApiSecret: config.APISecret,
+		SignatureSvc: signatureSvc,
+	}
 
 	srvMux := http.NewServeMux()
 	srvMux.HandleFunc("/api/v1/sign", handlers.SignAnswersHandler())
