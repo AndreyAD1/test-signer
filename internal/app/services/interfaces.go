@@ -1,6 +1,6 @@
 package services
 
 type SignatureService interface {
-	CreateSignature(userName string) error
+	CreateSignature(userName string) ([]byte, error)
 	VerifySignature() error
 }

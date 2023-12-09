@@ -24,3 +24,7 @@ type JWTClaims struct {
 	UserID string `json:"user_id"`
 	jwt.RegisteredClaims
 }
+
+type SignAnswersResponse struct {
+	Signature string `json:"signature"`
+}

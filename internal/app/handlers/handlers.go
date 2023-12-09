@@ -78,13 +78,21 @@ func (h HandlerContainer) SignAnswersHandler() func(w http.ResponseWriter, r *ht
 			return
 		}
 
-		err = h.SignatureSvc.CreateSignature(claims.UserID)
+		testSignature, err := h.SignatureSvc.CreateSignature(claims.UserID)
 		if err != nil {
+			log.Printf("create signature error for %s: %s", claims.UserID, err)
 			http.Error(w, "An internal error occurred.", http.StatusInternalServerError)
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
+		response := SignAnswersResponse{Signature: string(testSignature)}
+		err = json.NewEncoder(w).Encode(response)
+		if err != nil {
+			log.Printf("response composition error for %s: %s", claims.UserID, err)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 	}
 }
 
