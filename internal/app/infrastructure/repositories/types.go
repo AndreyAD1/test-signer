@@ -2,16 +2,17 @@ package repositories
 
 import "time"
 
-type Signature struct{
-	ID string
+type Signature struct {
+	ID        string
 	RequestID string
-	UserID string
+	UserID    string
 	CreatedAt time.Time
-	Answers []Answers
+	Answers   []Answers
+	Signature []byte
 }
 
 type Answers struct {
-	ID string
+	ID       string
 	Question string
-	Answer string
+	Answer   string
 }

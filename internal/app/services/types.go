@@ -6,6 +6,6 @@ type TestAnswer struct {
 }
 
 type ExternalSignature struct {
-	ID string `json:"id"`
+	ID     string `json:"id"`
 	UserID string `json:"user_id"`
 }

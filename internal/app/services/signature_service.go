@@ -2,8 +2,10 @@ package services
 
 import (
 	"context"
+	"crypto"
 	"crypto/rand"
 	"crypto/rsa"
+	"crypto/sha256"
 	"crypto/x509"
 	"encoding/json"
 	"encoding/pem"
@@ -17,22 +19,35 @@ import (
 
 type SignatureSvc struct {
 	signatureRepo r.SignatureRepository
-	publicKey *rsa.PublicKey
+	privatekey    *rsa.PrivateKey
+	publicKey     *rsa.PublicKey
 }
 
-func NewSignatureSvc(repo r.SignatureRepository, pubKeyFilePath string) (*SignatureSvc, error) {
-	raw, err := os.ReadFile(pubKeyFilePath)
+func NewSignatureSvc(
+	repo r.SignatureRepository,
+	privateKeyFilePath,
+	pubKeyFilePath string,
+) (*SignatureSvc, error) {
+	raw, err := os.ReadFile(privateKeyFilePath)
 	if err != nil {
 		return nil, err
 	}
 	block, _ := pem.Decode([]byte(raw))
-    var cert* x509.Certificate
-    cert, _ = x509.ParseCertificate(block.Bytes)
+	parseResult, _ := x509.ParsePKCS8PrivateKey(block.Bytes)
+	rsaPrivateKey := parseResult.(*rsa.PrivateKey)
+
+	raw, err = os.ReadFile(pubKeyFilePath)
 	if err != nil {
 		return nil, err
 	}
-    rsaPublicKey := cert.PublicKey.(*rsa.PublicKey)
-	return &SignatureSvc{repo, rsaPublicKey}, nil
+	block, _ = pem.Decode([]byte(raw))
+	var cert *x509.Certificate
+	cert, _ = x509.ParseCertificate(block.Bytes)
+	if err != nil {
+		return nil, err
+	}
+	rsaPublicKey := cert.PublicKey.(*rsa.PublicKey)
+	return &SignatureSvc{repo, rsaPrivateKey, rsaPublicKey}, nil
 }
 
 func (s *SignatureSvc) CreateSignature(
@@ -46,28 +61,37 @@ func (s *SignatureSvc) CreateSignature(
 	if err != nil {
 		return []byte{}, err
 	}
-	ciphertext, err := rsa.EncryptPKCS1v15(rand.Reader, s.publicKey, sign)
+
+	hash := sha256.New()
+	_, err = hash.Write(sign)
 	if err != nil {
-		log.Fatalf("Error encrypting message: %v", err)
+		log.Fatalf("Error hashing message: %v", err)
 	}
+	hashedMessage := hash.Sum(nil)
+	signature, err := rsa.SignPKCS1v15(rand.Reader, s.privatekey, crypto.SHA256, hashedMessage)
+	if err != nil {
+		log.Fatalf("Error signing message: %v", err)
+	}
+
 	answers := []r.Answers{}
 	for _, item := range testAnswers {
 		answers = append(
-			answers, 
+			answers,
 			r.Answers{Question: item.Question, Answer: item.Answer},
 		)
 	}
-	signature := r.Signature{
-		ID: uuid.New().String(),
+	dbSignature := r.Signature{
+		ID:        uuid.New().String(),
 		RequestID: requestID,
-		UserID: userID,
-		Answers: answers,
+		UserID:    userID,
+		Answers:   answers,
+		Signature: signature,
 	}
-	_, err = s.signatureRepo.Add(ctx, signature)
+	_, err = s.signatureRepo.Add(ctx, dbSignature)
 	if err != nil {
 		return []byte{}, fmt.Errorf("can not create a signature for %s: %w", userID, err)
 	}
-	return ciphertext, nil
+	return signature, nil
 }
 
 func (s *SignatureSvc) VerifySignature() error { return nil }
