@@ -11,6 +11,7 @@ import (
 	"time"
 
 	h "github.com/AndreyAD1/test-signer/internal/app/handlers"
+	r "github.com/AndreyAD1/test-signer/internal/app/infrastructure/repositories"
 	"github.com/AndreyAD1/test-signer/internal/app/services"
 	"github.com/AndreyAD1/test-signer/internal/configuration"
 )
@@ -23,7 +24,12 @@ type Server struct {
 var defaultTimeout = 5
 
 func NewServer(ctx context.Context, config configuration.ServerConfig) (*Server, error) {
-	signatureSvc := services.NewSignatureSvc()
+	signatureRepo, err := r.NewSignatureCollection(ctx, config.DatabaseURL)
+	if err != nil {
+		return nil, err
+	}
+
+	signatureSvc := services.NewSignatureSvc(signatureRepo, config.PublicKeyFile)
 	handlers := h.HandlerContainer{
 		ApiSecret:    config.APISecret,
 		SignatureSvc: signatureSvc,
