@@ -4,15 +4,19 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"os"
 	"time"
 
-	"github.com/spf13/cobra"
-	"github.com/caarlos0/env/v9"
 	"github.com/AndreyAD1/test-signer/internal/app"
 	"github.com/AndreyAD1/test-signer/internal/configuration"
+	"github.com/caarlos0/env/v9"
+	"github.com/spf13/cobra"
 )
 
 var (
+	apiSecret string
+	databaseURL string
+	debug bool
 	RootCmd = &cobra.Command{
 		Use:   "test-signer",
 		Short: "The 'Test Signer' service.",
@@ -31,6 +35,29 @@ func Execute() error {
 	return RootCmd.Execute()
 }
 
+func init() {
+	RootCmd.Flags().StringVarP(
+		&apiSecret,
+		"secret",
+		"s",
+		"",
+		"a secret to manage a JWT token",
+	)
+	RootCmd.Flags().StringVarP(
+		&databaseURL,
+		"dburl",
+		"u",
+		"",
+		"a database URL",
+	)
+	RootCmd.Flags().BoolP(
+		"debug",
+		"d",
+		false,
+		"a debug mode",
+	)
+}
+
 func run() error {
 	defer func() {
 		p := recover()
@@ -44,6 +71,16 @@ func run() error {
 		}
 		run()
 	}()
+
+	if apiSecret != "" {
+		os.Setenv("API_SECRET", apiSecret)
+	}
+	if databaseURL != "" {
+		os.Setenv("DATABASE_URL", databaseURL)
+	}
+	if debug {
+		os.Setenv("DEBUG", "true")
+	}
 	config := configuration.ServerConfig{}
 	err := env.Parse(&config)
 	if err != nil {
