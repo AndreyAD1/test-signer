@@ -2,9 +2,13 @@ package repositories
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgerrcode"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -29,6 +33,49 @@ func NewSignatureCollection(ctx context.Context, dbURL string) (*SignatureCollec
 }
 
 func (r *SignatureCollection) Add(ctx context.Context, signature Signature) (*Signature, error) {
+	transaction, err := r.dbPool.Begin(ctx)
+	if err != nil {
+		log.Println("can not begin a transaction")
+		return nil, err
+	}
+	defer func() {
+		logMsg := fmt.Sprintf(
+			"finish a transaction for a signature '%s'",
+			signature.RequestID,
+		)
+		log.Println(logMsg)
+		err := transaction.Rollback(ctx)
+		if err != nil && !errors.Is(err, pgx.ErrTxClosed) {
+			log.Println(logMsg)
+		}
+	}()
+	insertQuery := `INSERT INTO signatures (request_id, user_id, signature)
+	VALUES ($1, $2) RETURNING id, request_id, user_id, created_at, signature;`
+	var saved Signature
+	err = r.dbPool.QueryRow(
+		ctx,
+		insertQuery,
+		signature.RequestID,
+		signature.UserID,
+		signature.Signature,
+	).Scan(
+		&saved.ID,
+		&saved.RequestID,
+		&saved.UserID,
+		&saved.CreatedAt,
+		&saved.Signature,
+	)
+	if err == nil {
+		return &saved, nil
+	}
+	var pgxError *pgconn.PgError
+	if !errors.As(err, &pgxError) {
+		return nil, err
+	}
+
+	if pgxError.Code != pgerrcode.UniqueViolation {
+		return nil, err
+	}
 	return &signature, nil
 }
 
