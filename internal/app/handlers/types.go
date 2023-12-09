@@ -1,13 +1,16 @@
 package handlers
 
 import (
+	"time"
+
 	"github.com/AndreyAD1/test-signer/internal/app/services"
 	"github.com/golang-jwt/jwt/v5"
 )
 
 type HandlerContainer struct {
 	ApiSecret    string
-	SignatureSvc *services.SignatureSvc
+	SignatureSvc services.SignatureService
+	Timeout      time.Duration
 }
 
 type SignAnswersRequest struct {

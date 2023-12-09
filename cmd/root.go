@@ -14,10 +14,10 @@ import (
 )
 
 var (
-	apiSecret string
+	apiSecret   string
 	databaseURL string
-	debug bool
-	RootCmd = &cobra.Command{
+	debug       bool
+	RootCmd     = &cobra.Command{
 		Use:   "test-signer",
 		Short: "The 'Test Signer' service.",
 		Long: `The Test signer is a service that accepts a set of answers and 
@@ -27,7 +27,7 @@ var (
 			return run()
 		},
 	}
-	panicCounter int
+	panicCounter   int
 	panicThreshold = 10
 )
 

@@ -1,6 +1,8 @@
 package services
 
+import "context"
+
 type SignatureService interface {
-	CreateSignature(userName string) ([]byte, error)
+	CreateSignature(context.Context, string, string, []TestAnswer) ([]byte, error)
 	VerifySignature() error
 }

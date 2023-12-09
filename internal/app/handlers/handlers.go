@@ -1,18 +1,23 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"log"
 	"net/http"
 	"strings"
+	"time"
 
+	"github.com/AndreyAD1/test-signer/internal/app/services"
 	"github.com/golang-jwt/jwt/v5"
 )
 
 func (h HandlerContainer) SignAnswersHandler() func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
+		ctx, cancel := context.WithTimeout(context.Background(), h.Timeout*time.Second)
+		defer cancel()
 		if r.Method != http.MethodPost {
 			errMsg := fmt.Sprintf("Invalid method: '%s'. Expect 'POST'.", r.Method)
 			http.Error(w, errMsg, http.StatusMethodNotAllowed)
@@ -78,7 +83,21 @@ func (h HandlerContainer) SignAnswersHandler() func(w http.ResponseWriter, r *ht
 			return
 		}
 
-		testSignature, err := h.SignatureSvc.CreateSignature(claims.UserID)
+		testInfo := []services.TestAnswer{}
+		for _, answer := range requestInfo.TestAnswers {
+			internalAnswer := services.TestAnswer{
+				Question: answer.Question,
+				Answer:   answer.Answer,
+			}
+			testInfo = append(testInfo, internalAnswer)
+		}
+
+		testSignature, err := h.SignatureSvc.CreateSignature(
+			ctx,
+			requestInfo.ID,
+			claims.UserID,
+			testInfo,
+		)
 		if err != nil {
 			log.Printf("create signature error for %s: %s", claims.UserID, err)
 			http.Error(w, "An internal error occurred.", http.StatusInternalServerError)

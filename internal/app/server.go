@@ -20,11 +20,14 @@ type Server struct {
 	httpServer    *http.Server
 }
 
+var defaultTimeout = 5
+
 func NewServer(ctx context.Context, config configuration.ServerConfig) (*Server, error) {
 	signatureSvc := services.NewSignatureSvc()
 	handlers := h.HandlerContainer{
-		ApiSecret: config.APISecret,
+		ApiSecret:    config.APISecret,
 		SignatureSvc: signatureSvc,
+		Timeout:      time.Duration(defaultTimeout),
 	}
 
 	srvMux := http.NewServeMux()
