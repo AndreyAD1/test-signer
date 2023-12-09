@@ -16,8 +16,8 @@ import (
 )
 
 type Server struct {
-	shutdownFuncs   []func()
-	httpServer *http.Server
+	shutdownFuncs []func()
+	httpServer    *http.Server
 }
 
 func NewServer(ctx context.Context, config configuration.ServerConfig) (*Server, error) {
@@ -25,10 +25,10 @@ func NewServer(ctx context.Context, config configuration.ServerConfig) (*Server,
 	handlers := h.HandlerContainer{SignatureSvc: signatureSvc}
 
 	srvMux := http.NewServeMux()
-	srvMux.HandleFunc("/api/v1/sign", handlers.CreateTestSignatureHandler())
+	srvMux.HandleFunc("/api/v1/sign", handlers.SignAnswersHandler())
 	srvMux.HandleFunc("/api/v1/verify", handlers.VerifySignatureHandler())
 	httpServer := http.Server{
-		Addr:   config.ServerAddress,
+		Addr:    config.ServerAddress,
 		Handler: srvMux,
 	}
 	return &Server{httpServer: &httpServer}, nil
@@ -74,7 +74,7 @@ func (s *Server) Run(ctx context.Context) error {
 
 	go func() {
 		if err := s.httpServer.ListenAndServe(); err != http.ErrServerClosed {
-			log.Printf("can not start a server: %v", err)
+			log.Printf("an HTTP server runtime error: %v", err)
 		}
 		cancelCtx()
 	}()
