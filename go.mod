@@ -2,7 +2,10 @@ module github.com/AndreyAD1/test-signer
 
 go 1.21
 
-require github.com/spf13/cobra v1.8.0
+require (
+	github.com/caarlos0/env/v9 v9.0.0
+	github.com/spf13/cobra v1.8.0
+)
 
 require (
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
