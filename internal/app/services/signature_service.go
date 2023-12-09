@@ -4,9 +4,12 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/rsa"
+	"crypto/x509"
 	"encoding/json"
+	"encoding/pem"
 	"fmt"
 	"log"
+	"os"
 
 	r "github.com/AndreyAD1/test-signer/internal/app/infrastructure/repositories"
 	"github.com/google/uuid"
@@ -17,8 +20,19 @@ type SignatureSvc struct {
 	publicKey *rsa.PublicKey
 }
 
-func NewSignatureSvc(repo r.SignatureRepository, pkeyFilePath string) *SignatureSvc {
-	return &SignatureSvc{}
+func NewSignatureSvc(repo r.SignatureRepository, pubKeyFilePath string) (*SignatureSvc, error) {
+	raw, err := os.ReadFile(pubKeyFilePath)
+	if err != nil {
+		return nil, err
+	}
+	block, _ := pem.Decode([]byte(raw))
+    var cert* x509.Certificate
+    cert, _ = x509.ParseCertificate(block.Bytes)
+	if err != nil {
+		return nil, err
+	}
+    rsaPublicKey := cert.PublicKey.(*rsa.PublicKey)
+	return &SignatureSvc{repo, rsaPublicKey}, nil
 }
 
 func (s *SignatureSvc) CreateSignature(

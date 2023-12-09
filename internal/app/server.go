@@ -29,7 +29,10 @@ func NewServer(ctx context.Context, config configuration.ServerConfig) (*Server,
 		return nil, err
 	}
 
-	signatureSvc := services.NewSignatureSvc(signatureRepo, config.PublicKeyFile)
+	signatureSvc, err := services.NewSignatureSvc(signatureRepo, config.PublicKeyFile)
+	if err != nil {
+		return nil, err
+	}
 	handlers := h.HandlerContainer{
 		ApiSecret:    config.APISecret,
 		SignatureSvc: signatureSvc,

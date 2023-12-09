@@ -14,7 +14,7 @@ type HandlerContainer struct {
 }
 
 type SignAnswersRequest struct {
-	ID          string   `json:"id"`
+	ID          string   `json:"id"` // an idempotency key
 	TestAnswers []answer `json:"test"`
 }
 
