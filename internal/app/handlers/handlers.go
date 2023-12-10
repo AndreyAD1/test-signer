@@ -119,9 +119,45 @@ func (h HandlerContainer) SignAnswersHandler() func(w http.ResponseWriter, r *ht
 
 func (h HandlerContainer) VerifySignatureHandler() func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
-		err := h.SignatureSvc.VerifySignature()
+		ctx, cancel := context.WithTimeout(context.Background(), h.Timeout*time.Second)
+		defer cancel()
+		if r.Method != http.MethodPost {
+			errMsg := fmt.Sprintf("Invalid method: '%s'. Expect 'POST'.", r.Method)
+			http.Error(w, errMsg, http.StatusMethodNotAllowed)
+			return
+		}
+		requestBody, err := io.ReadAll(r.Body)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		var requestInfo VerifyRequest
+		if err := json.Unmarshal(requestBody, &requestInfo); err != nil {
+			http.Error(
+				w,
+				fmt.Sprintf("unexpected request body: %s", err.Error()),
+				http.StatusBadRequest,
+			)
+			return
+		}
+		if requestInfo.UserID == "" || requestInfo.Signature == "" {
+			http.Error(
+				w,
+				"'user_id' and 'signature' are required fields'",
+				http.StatusBadRequest,
+			)
+			return
+		}
+		decodedSignature, err := base64.StdEncoding.DecodeString(requestInfo.Signature)
+		if err != nil {
+			errMsg := fmt.Sprintf("a signature is invalid.")
+			log.Printf("a signature is invalid: %v", err)
+			http.Error(w, errMsg, http.StatusBadRequest)
+			return
+		}
+		err = h.SignatureSvc.VerifySignature(ctx, requestInfo.UserID, decodedSignature)
+		if err != nil {
+			http.Error(w, "An internal error", http.StatusInternalServerError)
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")

@@ -31,3 +31,8 @@ type JWTClaims struct {
 type SignAnswersResponse struct {
 	Signature string `json:"signature"`
 }
+
+type VerifyRequest struct {
+	UserID string `json:"user_id"`
+	Signature string `json:"signature"`
+}

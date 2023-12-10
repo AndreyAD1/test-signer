@@ -84,25 +84,30 @@ func (s *SignatureSvc) CreateSignature(
 	ciphertext := aesgcm.Seal(nil, nonce, sign, nil)
 	ciphertext = append(nonce, ciphertext...)
 	return ciphertext, nil
-
-	// answers := []r.TestDetails{}
-	// for _, item := range testAnswers {
-	// 	answers = append(
-	// 		answers,
-	// 		r.TestDetails{Question: item.Question, Answer: item.Answer},
-	// 	)
-	// }
-	// dbSignature := r.Signature{
-	// 	ID:        uuid.New().String(),
-	// 	RequestID: requestID,
-	// 	UserID:    userID,
-	// 	Answers:   answers,
-	// }
-	// _, err = s.signatureRepo.Add(ctx, dbSignature)
-	// if err != nil {
-	// 	return []byte{}, fmt.Errorf("can not create a signature for %s: %w", userID, err)
-	// }
-	// return base64.StdEncoding.EncodeToString(signature), nil
 }
 
-func (s *SignatureSvc) VerifySignature() error { return nil }
+func (s *SignatureSvc) VerifySignature(ctx context.Context, username string, ciphered []byte) error {
+	nonce, ciphered := ciphered[:12], ciphered[12:]
+	block, err := aes.NewCipher(s.key)
+	if err != nil {
+		log.Printf("Error creating AES cipher for decryption: %v", err)
+		return fmt.Errorf("Error creating AES cipher for decryption: %w", err)
+	}
+	aesgcm, err := cipher.NewGCM(block)
+	if err != nil {
+		log.Printf("Error creating GCM for decryption: %v", err)
+		return fmt.Errorf("Error creating GCM for decryption: %w", err)
+	}
+	decyphered, err := aesgcm.Open(nil, nonce, ciphered, nil)
+	if err != nil {
+		log.Printf("Error decrypting data: %v", err)
+		return fmt.Errorf("Error decrypting data: %w", err)
+	}
+	var signature ExternalSignature
+	if err := json.Unmarshal(decyphered, &signature); err != nil {
+		log.Printf("can not unmarshal a decyphered signature: %v", err)
+		return err
+	}
+	fmt.Println(signature)
+	return nil 
+}
