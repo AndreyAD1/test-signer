@@ -15,7 +15,7 @@ type Signature struct {
 }
 
 type TestDetails struct {
-	ID       string
+	ID       int
 	Question string
 	Answer   string
 }

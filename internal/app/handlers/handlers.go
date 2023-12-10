@@ -109,7 +109,7 @@ func (h HandlerContainer) SignAnswersHandler() func(w http.ResponseWriter, r *ht
 			return
 		}
 		if err != nil {
-			log.Printf("create signature error for %s: %s", claims.UserID, err)
+			log.Printf("a DB signature error for %s: %s", claims.UserID, err)
 			http.Error(w, "An internal error occurred.", http.StatusInternalServerError)
 			return
 		}

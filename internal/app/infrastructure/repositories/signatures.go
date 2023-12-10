@@ -49,8 +49,8 @@ func (r *SignatureCollection) Add(ctx context.Context, signature Signature) (*Si
 	}()
 	insertQuery := `INSERT INTO signatures (id, request_id, user_id, created_at)
 	VALUES ($1, $2, $3, $4) RETURNING id, request_id, user_id, created_at;`
-	var saved Signature
-	err = r.dbPool.QueryRow(
+	var savedSignature Signature
+	err = transaction.QueryRow(
 		ctx,
 		insertQuery,
 		signature.ID,
@@ -58,24 +58,56 @@ func (r *SignatureCollection) Add(ctx context.Context, signature Signature) (*Si
 		signature.UserID,
 		signature.CreatedAt,
 	).Scan(
-		&saved.ID,
-		&saved.RequestID,
-		&saved.UserID,
-		&saved.CreatedAt,
+		&savedSignature.ID,
+		&savedSignature.RequestID,
+		&savedSignature.UserID,
+		&savedSignature.CreatedAt,
 	)
-	if err == nil {
-		return &saved, nil
-	}
-	var pgxError *pgconn.PgError
-	if !errors.As(err, &pgxError) {
-		log.Printf("unexpected DB error: %v", err)
+	if err != nil {
+		var pgxError *pgconn.PgError
+		if !errors.As(err, &pgxError) {
+			log.Printf("unexpected DB error: %v", err)
+			return nil, err
+		}
+		if pgxError.Code == pgerrcode.UniqueViolation {
+			log.Printf("the signature already exists: %v", signature.RequestID)
+			return nil, ErrDuplicate
+		}
 		return nil, err
 	}
-	if pgxError.Code == pgerrcode.UniqueViolation {
-		log.Printf("the signature already exists: %v", signature.RequestID)
-		return nil, ErrDuplicate
+	insertAnswerQuery := `INSERT INTO test_details (signature_id, question, answer)
+	VALUES ($1, $2, $3) RETURNING id, question, answer;`
+	savedAnswers := []TestDetails{}
+	for _, answer := range signature.Answers {
+		var savedTestDetails TestDetails
+		err := transaction.QueryRow(
+			ctx, 
+			insertAnswerQuery, 
+			savedSignature.ID, 
+			answer.Question, 
+			answer.Answer,
+		).Scan(
+			&savedTestDetails.ID,
+			&savedTestDetails.Question,
+			&savedTestDetails.Answer,
+		)
+		if err != nil {
+			log.Printf("unexpected DB error: %v", err)
+			return nil, err
+		}
+		savedAnswers = append(savedAnswers, savedTestDetails)
 	}
-	return nil, err
+	savedSignature.Answers = savedAnswers
+	if err := transaction.Commit(ctx); err != nil {
+		log.Printf(
+			"can not close a transaction for the signature %v - %v: %v",
+			signature.RequestID,
+			signature.UserID,
+			err,
+		)
+		return &savedSignature, err
+	}
+	return &savedSignature, err
 }
 
 func (r *SignatureCollection) Query(ctx context.Context, spec Specification) ([]Signature, error) {
