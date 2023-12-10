@@ -100,7 +100,6 @@ func (s *SignatureSvc) VerifySignature(ctx context.Context, username string, cip
 		log.Printf("can not unmarshal a decyphered signature: %v", err)
 		return StoredSignature{}, ErrInvalidSignature
 	}
-	log.Println(receivedSignature.ID)
 	spec := specs.NewSignatureSpecificationByID(receivedSignature.ID)
 	signatures, err := s.signatureRepo.Query(ctx, spec)
 	if err != nil {
@@ -110,7 +109,7 @@ func (s *SignatureSvc) VerifySignature(ctx context.Context, username string, cip
 		return StoredSignature{}, ErrInvalidSignature
 	}
 	foundSignature := signatures[0]
-	if receivedSignature.UserID != foundSignature.UserID {
+	if receivedSignature.UserID != username {
 		return StoredSignature{}, ErrWrongOwner
 	}
 	answers := []string{}

@@ -169,6 +169,10 @@ func (h HandlerContainer) VerifySignatureHandler() func(w http.ResponseWriter, r
 			http.Error(w, "Unexpected signature", http.StatusBadRequest)
 			return
 		}
+		if errors.Is(err, services.ErrWrongOwner) {
+			http.Error(w, "The owner is wrong", http.StatusForbidden)
+			return
+		}
 		if err != nil {
 			http.Error(w, "An internal error", http.StatusInternalServerError)
 			return
