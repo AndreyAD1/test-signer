@@ -2,16 +2,17 @@ package services
 
 import (
 	"context"
-	"crypto"
+	"crypto/aes"
+	"crypto/cipher"
 	"crypto/rand"
 	"crypto/rsa"
-	"crypto/sha256"
 	"crypto/x509"
-	// "encoding/base64"
+	"fmt"
+	"io"
+
 	"encoding/json"
 	"encoding/pem"
 
-	// "fmt"
 	"log"
 	"os"
 
@@ -23,6 +24,7 @@ type SignatureSvc struct {
 	signatureRepo r.SignatureRepository
 	privatekey    *rsa.PrivateKey
 	publicKey     *rsa.PublicKey
+	key           []byte
 }
 
 func NewSignatureSvc(
@@ -49,7 +51,7 @@ func NewSignatureSvc(
 		return nil, err
 	}
 	rsaPublicKey := cert.PublicKey.(*rsa.PublicKey)
-	return &SignatureSvc{repo, rsaPrivateKey, rsaPublicKey}, nil
+	return &SignatureSvc{repo, rsaPrivateKey, rsaPublicKey, []byte("my very-very-very secret")}, nil
 }
 
 func (s *SignatureSvc) CreateSignature(
@@ -64,16 +66,24 @@ func (s *SignatureSvc) CreateSignature(
 		return []byte{}, err
 	}
 
-	hash := sha256.New()
-	_, err = hash.Write(sign)
+	block, err := aes.NewCipher(s.key)
 	if err != nil {
-		log.Fatalf("Error hashing message: %v", err)
+		log.Printf("Error creating AES cipher: %v", err)
+		return []byte{}, fmt.Errorf("Error creating AES cipher: %w", err)
 	}
-	hashedMessage := hash.Sum(nil)
-	signature, err := rsa.SignPKCS1v15(rand.Reader, s.privatekey, crypto.SHA256, hashedMessage)
+	nonce := make([]byte, 12)
+	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
+		log.Printf("Error generating nonce: %v", err)
+		return []byte{}, fmt.Errorf("Error generating nonce: %w", err)
+	}
+	aesgcm, err := cipher.NewGCM(block)
 	if err != nil {
-		log.Fatalf("Error signing message: %v", err)
+		log.Printf("Error creating GCM: %v", err)
+		return []byte{}, fmt.Errorf("Error creating GCM: %q", err)
 	}
+	ciphertext := aesgcm.Seal(nil, nonce, sign, nil)
+	ciphertext = append(nonce, ciphertext...)
+	return ciphertext, nil
 
 	// answers := []r.TestDetails{}
 	// for _, item := range testAnswers {
@@ -93,7 +103,6 @@ func (s *SignatureSvc) CreateSignature(
 	// 	return []byte{}, fmt.Errorf("can not create a signature for %s: %w", userID, err)
 	// }
 	// return base64.StdEncoding.EncodeToString(signature), nil
-	return signature, nil
 }
 
 func (s *SignatureSvc) VerifySignature() error { return nil }
