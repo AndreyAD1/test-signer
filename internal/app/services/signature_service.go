@@ -16,6 +16,7 @@ import (
 
 	"github.com/AndreyAD1/test-signer/internal/app/infrastructure/repositories"
 	r "github.com/AndreyAD1/test-signer/internal/app/infrastructure/repositories"
+	specs "github.com/AndreyAD1/test-signer/internal/app/infrastructure/specifications"
 	"github.com/google/uuid"
 )
 
@@ -50,7 +51,8 @@ func (s *SignatureSvc) CreateSignature(
 	userID string,
 	testAnswers []TestAnswer,
 ) ([]byte, error) {
-	externalSignature := ExternalSignature{uuid.New().String(), userID}
+	signatureID := uuid.New()
+	externalSignature := ExternalSignature{signatureID.String(), userID}
 	sign, err := json.Marshal(externalSignature)
 	if err != nil {
 		return []byte{}, err
@@ -69,7 +71,7 @@ func (s *SignatureSvc) CreateSignature(
 		answers = append(answers, d)
 	}
 	storageSignature := repositories.Signature{
-		ID: uuid.New(),
+		ID: signatureID,
 		RequestID: requestID,
 		UserID: userID,
 		CreatedAt: time.Now(),
@@ -86,18 +88,34 @@ func (s *SignatureSvc) CreateSignature(
 	return ciphertext, nil
 }
 
-func (s *SignatureSvc) VerifySignature(ctx context.Context, username string, ciphered []byte) error {
+func (s *SignatureSvc) VerifySignature(ctx context.Context, username string, ciphered []byte) (StoredSignature, error) {
 	nonce, ciphered := ciphered[:12], ciphered[12:]
 	decyphered, err := s.cipher.Open(nil, nonce, ciphered, nil)
 	if err != nil {
 		log.Printf("Error decrypting data: %v", err)
-		return ErrInvalidSignature
+		return StoredSignature{}, ErrInvalidSignature
 	}
-	var signature ExternalSignature
-	if err := json.Unmarshal(decyphered, &signature); err != nil {
+	var receivedSignature ExternalSignature
+	if err := json.Unmarshal(decyphered, &receivedSignature); err != nil {
 		log.Printf("can not unmarshal a decyphered signature: %v", err)
-		return ErrInvalidSignature
+		return StoredSignature{}, ErrInvalidSignature
 	}
-	fmt.Println(signature)
-	return nil
+	log.Println(receivedSignature.ID)
+	spec := specs.NewSignatureSpecificationByID(receivedSignature.ID)
+	signatures, err := s.signatureRepo.Query(ctx, spec)
+	if err != nil {
+		return StoredSignature{}, err
+	}
+	if len(signatures) == 0 {
+		return StoredSignature{}, ErrInvalidSignature
+	}
+	foundSignature := signatures[0]
+	if receivedSignature.UserID != foundSignature.UserID {
+		return StoredSignature{}, ErrWrongOwner
+	}
+	answers := []string{}
+	for _, answer := range foundSignature.Answers {
+		answers = append(answers, answer.Answer)
+	}
+	return StoredSignature{Answers: answers, Timestamp: foundSignature.CreatedAt}, nil
 }

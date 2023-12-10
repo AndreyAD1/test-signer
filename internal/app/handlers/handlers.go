@@ -164,7 +164,7 @@ func (h HandlerContainer) VerifySignatureHandler() func(w http.ResponseWriter, r
 			http.Error(w, errMsg, http.StatusBadRequest)
 			return
 		}
-		err = h.SignatureSvc.VerifySignature(ctx, requestInfo.UserID, decodedSignature)
+		signature, err := h.SignatureSvc.VerifySignature(ctx, requestInfo.UserID, decodedSignature)
 		if errors.Is(err, services.ErrInvalidSignature) {
 			http.Error(w, "Unexpected signature", http.StatusBadRequest)
 			return
@@ -175,5 +175,15 @@ func (h HandlerContainer) VerifySignatureHandler() func(w http.ResponseWriter, r
 		}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
+		err = json.NewEncoder(w).Encode(signature)
+		if err != nil {
+			log.Printf(
+				"response composition error for %s: %s",
+				requestInfo.UserID, 
+				err,
+			)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 	}
 }

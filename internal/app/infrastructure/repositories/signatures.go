@@ -111,5 +111,59 @@ func (r *SignatureCollection) Add(ctx context.Context, signature Signature) (*Si
 }
 
 func (r *SignatureCollection) Query(ctx context.Context, spec Specification) ([]Signature, error) {
-	return []Signature{}, ErrNotImplemented
+	query, queryArgs := spec.ToSQL()
+	rows, err := r.dbPool.Query(ctx, query, pgx.NamedArgs(queryArgs))
+	if err != nil {
+		log.Printf("a query error: '%v'", query)
+		return nil, err
+	}
+	defer rows.Close()
+	var signatures []Signature
+	for rows.Next() {
+		var signature Signature
+		if err := rows.Scan(
+			&signature.ID,
+			&signature.RequestID,
+			&signature.UserID,
+			&signature.CreatedAt,
+		); err != nil {
+			log.Printf(
+				"can not scan a signature from a query result: %v: %v",
+				query,
+				queryArgs,
+			)
+			return nil, err
+		}
+		signatures = append(signatures, signature)
+	}
+	detailsQuery := `SELECT id, question, answer FROM test_details 
+	WHERE signature_id = $1;`
+
+	for i, signature := range signatures {
+		rows, err := r.dbPool.Query(ctx, detailsQuery, signature.ID)
+		if err != nil {
+			log.Printf("a query error: '%v'", query)
+			return nil, err
+		}
+		defer rows.Close()
+		allTestDetails := []TestDetails{}
+		for rows.Next() {
+			var details TestDetails
+			if err := rows.Scan(
+				&details.ID,
+				&details.Question,
+				&details.Answer,
+			); err != nil {
+				log.Printf(
+					"can not scan test detais from a query result: %v: %v",
+					query,
+					queryArgs,
+				)
+				return nil, err
+			}
+			allTestDetails = append(allTestDetails, details)
+		}
+		signatures[i].Answers = allTestDetails
+	}
+	return signatures, nil
 }
