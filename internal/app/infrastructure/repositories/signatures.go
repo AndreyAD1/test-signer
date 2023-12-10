@@ -49,21 +49,19 @@ func (r *SignatureCollection) Add(ctx context.Context, signature Signature) (*Si
 			log.Println(logMsg)
 		}
 	}()
-	insertQuery := `INSERT INTO signatures (request_id, user_id, signature)
-	VALUES ($1, $2) RETURNING id, request_id, user_id, created_at, signature;`
+	insertQuery := `INSERT INTO signatures (request_id, user_id)
+	VALUES ($1, $2) RETURNING id, request_id, user_id, created_at;`
 	var saved Signature
 	err = r.dbPool.QueryRow(
 		ctx,
 		insertQuery,
 		signature.RequestID,
 		signature.UserID,
-		signature.Signature,
 	).Scan(
 		&saved.ID,
 		&saved.RequestID,
 		&saved.UserID,
 		&saved.CreatedAt,
-		&saved.Signature,
 	)
 	if err == nil {
 		return &saved, nil

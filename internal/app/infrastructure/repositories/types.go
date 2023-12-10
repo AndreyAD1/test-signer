@@ -7,11 +7,10 @@ type Signature struct {
 	RequestID string
 	UserID    string
 	CreatedAt time.Time
-	Answers   []Answers
-	Signature []byte
+	Answers   []TestDetails
 }
 
-type Answers struct {
+type TestDetails struct {
 	ID       string
 	Question string
 	Answer   string

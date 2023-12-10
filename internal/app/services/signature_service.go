@@ -7,9 +7,11 @@ import (
 	"crypto/rsa"
 	"crypto/sha256"
 	"crypto/x509"
+	// "encoding/base64"
 	"encoding/json"
 	"encoding/pem"
-	"fmt"
+
+	// "fmt"
 	"log"
 	"os"
 
@@ -73,24 +75,24 @@ func (s *SignatureSvc) CreateSignature(
 		log.Fatalf("Error signing message: %v", err)
 	}
 
-	answers := []r.Answers{}
-	for _, item := range testAnswers {
-		answers = append(
-			answers,
-			r.Answers{Question: item.Question, Answer: item.Answer},
-		)
-	}
-	dbSignature := r.Signature{
-		ID:        uuid.New().String(),
-		RequestID: requestID,
-		UserID:    userID,
-		Answers:   answers,
-		Signature: signature,
-	}
-	_, err = s.signatureRepo.Add(ctx, dbSignature)
-	if err != nil {
-		return []byte{}, fmt.Errorf("can not create a signature for %s: %w", userID, err)
-	}
+	// answers := []r.TestDetails{}
+	// for _, item := range testAnswers {
+	// 	answers = append(
+	// 		answers,
+	// 		r.TestDetails{Question: item.Question, Answer: item.Answer},
+	// 	)
+	// }
+	// dbSignature := r.Signature{
+	// 	ID:        uuid.New().String(),
+	// 	RequestID: requestID,
+	// 	UserID:    userID,
+	// 	Answers:   answers,
+	// }
+	// _, err = s.signatureRepo.Add(ctx, dbSignature)
+	// if err != nil {
+	// 	return []byte{}, fmt.Errorf("can not create a signature for %s: %w", userID, err)
+	// }
+	// return base64.StdEncoding.EncodeToString(signature), nil
 	return signature, nil
 }
 

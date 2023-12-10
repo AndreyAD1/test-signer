@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -105,7 +106,8 @@ func (h HandlerContainer) SignAnswersHandler() func(w http.ResponseWriter, r *ht
 		}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
-		response := SignAnswersResponse{Signature: string(testSignature)}
+		base64Signature := base64.StdEncoding.EncodeToString(testSignature)
+		response := SignAnswersResponse{Signature: base64Signature}
 		err = json.NewEncoder(w).Encode(response)
 		if err != nil {
 			log.Printf("response composition error for %s: %s", claims.UserID, err)
