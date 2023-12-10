@@ -100,6 +100,14 @@ func (h HandlerContainer) SignAnswersHandler() func(w http.ResponseWriter, r *ht
 			claims.UserID,
 			testInfo,
 		)
+		if errors.Is(err, services.ErrDuplicatedSignature) {
+			http.Error(
+				w, 
+				fmt.Sprintf("A repeated request_id '%s'", requestInfo.ID), 
+				http.StatusBadRequest,
+			)
+			return
+		}
 		if err != nil {
 			log.Printf("create signature error for %s: %s", claims.UserID, err)
 			http.Error(w, "An internal error occurred.", http.StatusInternalServerError)

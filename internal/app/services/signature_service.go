@@ -5,6 +5,7 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
+	"errors"
 	"fmt"
 	"io"
 	"time"
@@ -74,7 +75,14 @@ func (s *SignatureSvc) CreateSignature(
 		CreatedAt: time.Now(),
 		Answers: answers,
 	}
-	s.signatureRepo.Add(ctx, storageSignature)
+	if _, err = s.signatureRepo.Add(ctx, storageSignature); err != nil {
+		if errors.Is(err, repositories.ErrDuplicate) {
+			log.Printf("duplicated request from a user: %v", userID)
+			return []byte{}, errors.Join(ErrDuplicatedSignature, err)
+		}
+		log.Printf("an unexpected repository error: %v: %v", userID, err)
+		return []byte{}, err
+	}
 	return ciphertext, nil
 }
 

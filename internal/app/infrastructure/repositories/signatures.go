@@ -42,19 +42,21 @@ func (r *SignatureCollection) Add(ctx context.Context, signature Signature) (*Si
 		err := transaction.Rollback(ctx)
 		if err != nil && !errors.Is(err, pgx.ErrTxClosed) {
 			log.Printf(
-				"finish a transaction for a signature '%s'",
+				"can not finish a transaction for a signature '%s'",
 				signature.RequestID,
 			)
 		}
 	}()
 	insertQuery := `INSERT INTO signatures (id, request_id, user_id, created_at)
-	VALUES ($1, $2) RETURNING id, request_id, user_id, created_at;`
+	VALUES ($1, $2, $3, $4) RETURNING id, request_id, user_id, created_at;`
 	var saved Signature
 	err = r.dbPool.QueryRow(
 		ctx,
 		insertQuery,
+		signature.ID,
 		signature.RequestID,
 		signature.UserID,
+		signature.CreatedAt,
 	).Scan(
 		&saved.ID,
 		&saved.RequestID,
@@ -66,13 +68,14 @@ func (r *SignatureCollection) Add(ctx context.Context, signature Signature) (*Si
 	}
 	var pgxError *pgconn.PgError
 	if !errors.As(err, &pgxError) {
+		log.Printf("unexpected DB error: %v", err)
 		return nil, err
 	}
-
-	if pgxError.Code != pgerrcode.UniqueViolation {
-		return nil, err
+	if pgxError.Code == pgerrcode.UniqueViolation {
+		log.Printf("the signature already exists: %v", signature.RequestID)
+		return nil, ErrDuplicate
 	}
-	return &signature, nil
+	return nil, err
 }
 
 func (r *SignatureCollection) Query(ctx context.Context, spec Specification) ([]Signature, error) {
