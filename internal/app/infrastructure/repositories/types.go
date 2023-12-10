@@ -1,9 +1,13 @@
 package repositories
 
-import "time"
+import (
+	"time"
+
+	"github.com/google/uuid"
+)
 
 type Signature struct {
-	ID        string
+	ID        uuid.UUID
 	RequestID string
 	UserID    string
 	CreatedAt time.Time

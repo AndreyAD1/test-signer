@@ -7,11 +7,13 @@ import (
 	"crypto/rand"
 	"fmt"
 	"io"
+	"time"
 
 	"encoding/json"
 
 	"log"
 
+	"github.com/AndreyAD1/test-signer/internal/app/infrastructure/repositories"
 	r "github.com/AndreyAD1/test-signer/internal/app/infrastructure/repositories"
 	"github.com/google/uuid"
 )
@@ -52,7 +54,6 @@ func (s *SignatureSvc) CreateSignature(
 	if err != nil {
 		return []byte{}, err
 	}
-
 	nonce := make([]byte, 12)
 	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
 		log.Printf("Error generating nonce: %v", err)
@@ -60,6 +61,20 @@ func (s *SignatureSvc) CreateSignature(
 	}
 	ciphertext := s.cipher.Seal(nil, nonce, sign, nil)
 	ciphertext = append(nonce, ciphertext...)
+
+	answers := []repositories.TestDetails{}
+	for _, a := range testAnswers {
+		d := repositories.TestDetails{Question: a.Question, Answer: a.Answer}
+		answers = append(answers, d)
+	}
+	storageSignature := repositories.Signature{
+		ID: uuid.New(),
+		RequestID: requestID,
+		UserID: userID,
+		CreatedAt: time.Now(),
+		Answers: answers,
+	}
+	s.signatureRepo.Add(ctx, storageSignature)
 	return ciphertext, nil
 }
 

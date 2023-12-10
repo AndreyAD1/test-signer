@@ -39,17 +39,15 @@ func (r *SignatureCollection) Add(ctx context.Context, signature Signature) (*Si
 		return nil, err
 	}
 	defer func() {
-		logMsg := fmt.Sprintf(
-			"finish a transaction for a signature '%s'",
-			signature.RequestID,
-		)
-		log.Println(logMsg)
 		err := transaction.Rollback(ctx)
 		if err != nil && !errors.Is(err, pgx.ErrTxClosed) {
-			log.Println(logMsg)
+			log.Printf(
+				"finish a transaction for a signature '%s'",
+				signature.RequestID,
+			)
 		}
 	}()
-	insertQuery := `INSERT INTO signatures (request_id, user_id)
+	insertQuery := `INSERT INTO signatures (id, request_id, user_id, created_at)
 	VALUES ($1, $2) RETURNING id, request_id, user_id, created_at;`
 	var saved Signature
 	err = r.dbPool.QueryRow(
