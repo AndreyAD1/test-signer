@@ -5,16 +5,12 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
-	"crypto/rsa"
-	"crypto/x509"
 	"fmt"
 	"io"
 
 	"encoding/json"
-	"encoding/pem"
 
 	"log"
-	"os"
 
 	r "github.com/AndreyAD1/test-signer/internal/app/infrastructure/repositories"
 	"github.com/google/uuid"
@@ -22,36 +18,27 @@ import (
 
 type SignatureSvc struct {
 	signatureRepo r.SignatureRepository
-	privatekey    *rsa.PrivateKey
-	publicKey     *rsa.PublicKey
-	key           []byte
+	cipher        cipher.AEAD
 }
 
 func NewSignatureSvc(
 	repo r.SignatureRepository,
-	privateKeyFilePath,
-	pubKeyFilePath string,
+	key string,
 ) (*SignatureSvc, error) {
-	raw, err := os.ReadFile(privateKeyFilePath)
-	if err != nil {
-		return nil, err
+	if len([]byte(key)) < 32 {
+		return nil, fmt.Errorf("too short key: %s", key)
 	}
-	block, _ := pem.Decode([]byte(raw))
-	parseResult, _ := x509.ParsePKCS8PrivateKey(block.Bytes)
-	rsaPrivateKey := parseResult.(*rsa.PrivateKey)
-
-	raw, err = os.ReadFile(pubKeyFilePath)
+	block, err := aes.NewCipher([]byte(key)[:32])
 	if err != nil {
-		return nil, err
+		log.Printf("Error creating AES cipher: %v", err)
+		return nil, fmt.Errorf("Error creating AES cipher: %w", err)
 	}
-	block, _ = pem.Decode([]byte(raw))
-	var cert *x509.Certificate
-	cert, _ = x509.ParseCertificate(block.Bytes)
+	aesgcm, err := cipher.NewGCM(block)
 	if err != nil {
-		return nil, err
+		log.Printf("Error creating GCM: %v", err)
+		return nil, fmt.Errorf("Error creating GCM: %q", err)
 	}
-	rsaPublicKey := cert.PublicKey.(*rsa.PublicKey)
-	return &SignatureSvc{repo, rsaPrivateKey, rsaPublicKey, []byte("my very-very-very secret")}, nil
+	return &SignatureSvc{repo, aesgcm}, nil
 }
 
 func (s *SignatureSvc) CreateSignature(
@@ -66,48 +53,28 @@ func (s *SignatureSvc) CreateSignature(
 		return []byte{}, err
 	}
 
-	block, err := aes.NewCipher(s.key)
-	if err != nil {
-		log.Printf("Error creating AES cipher: %v", err)
-		return []byte{}, fmt.Errorf("Error creating AES cipher: %w", err)
-	}
 	nonce := make([]byte, 12)
 	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
 		log.Printf("Error generating nonce: %v", err)
 		return []byte{}, fmt.Errorf("Error generating nonce: %w", err)
 	}
-	aesgcm, err := cipher.NewGCM(block)
-	if err != nil {
-		log.Printf("Error creating GCM: %v", err)
-		return []byte{}, fmt.Errorf("Error creating GCM: %q", err)
-	}
-	ciphertext := aesgcm.Seal(nil, nonce, sign, nil)
+	ciphertext := s.cipher.Seal(nil, nonce, sign, nil)
 	ciphertext = append(nonce, ciphertext...)
 	return ciphertext, nil
 }
 
 func (s *SignatureSvc) VerifySignature(ctx context.Context, username string, ciphered []byte) error {
 	nonce, ciphered := ciphered[:12], ciphered[12:]
-	block, err := aes.NewCipher(s.key)
-	if err != nil {
-		log.Printf("Error creating AES cipher for decryption: %v", err)
-		return fmt.Errorf("Error creating AES cipher for decryption: %w", err)
-	}
-	aesgcm, err := cipher.NewGCM(block)
-	if err != nil {
-		log.Printf("Error creating GCM for decryption: %v", err)
-		return fmt.Errorf("Error creating GCM for decryption: %w", err)
-	}
-	decyphered, err := aesgcm.Open(nil, nonce, ciphered, nil)
+	decyphered, err := s.cipher.Open(nil, nonce, ciphered, nil)
 	if err != nil {
 		log.Printf("Error decrypting data: %v", err)
-		return fmt.Errorf("Error decrypting data: %w", err)
+		return ErrInvalidSignature
 	}
 	var signature ExternalSignature
 	if err := json.Unmarshal(decyphered, &signature); err != nil {
 		log.Printf("can not unmarshal a decyphered signature: %v", err)
-		return err
+		return ErrInvalidSignature
 	}
 	fmt.Println(signature)
-	return nil 
+	return nil
 }

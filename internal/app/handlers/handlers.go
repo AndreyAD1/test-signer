@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -156,11 +157,15 @@ func (h HandlerContainer) VerifySignatureHandler() func(w http.ResponseWriter, r
 			return
 		}
 		err = h.SignatureSvc.VerifySignature(ctx, requestInfo.UserID, decodedSignature)
+		if errors.Is(err, services.ErrInvalidSignature) {
+			http.Error(w, "Unexpected signature", http.StatusBadRequest)
+			return
+		}
 		if err != nil {
 			http.Error(w, "An internal error", http.StatusInternalServerError)
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusCreated)
+		w.WriteHeader(http.StatusOK)
 	}
 }

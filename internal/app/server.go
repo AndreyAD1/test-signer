@@ -31,8 +31,7 @@ func NewServer(ctx context.Context, config configuration.ServerConfig) (*Server,
 
 	signatureSvc, err := services.NewSignatureSvc(
 		signatureRepo,
-		config.PrivateKeyFile,
-		config.PublicKeyFile,
+		config.SignKey,
 	)
 	if err != nil {
 		return nil, err

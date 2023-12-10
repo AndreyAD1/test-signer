@@ -33,6 +33,6 @@ type SignAnswersResponse struct {
 }
 
 type VerifyRequest struct {
-	UserID string `json:"user_id"`
+	UserID    string `json:"user_id"`
 	Signature string `json:"signature"`
 }
